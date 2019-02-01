@@ -1,0 +1,70 @@
+---
+- name: Deployment
+  hosts: server
+  vars: 
+    ansible_ssh_port: 5555
+  remote_user : root
+  tasks:
+      - name: APT | Update
+        apt:
+            update_cache: yes
+            upgrade: yes
+      - name: APT | Install packages
+        apt:
+            name:
+                - vim
+                - sudo
+                - mailutils
+            state: latest
+      - name: APT | Install apache2
+        apt:
+            name: apache2
+            state: latest
+      - name: SCRIPTS | Copying .sh
+        copy:
+            src: scripts/
+            dest: /home/che
+            mode: u=rwx,g=rx,o=rx
+      - name: IPTABLES Updates
+        cron:
+            name: "iptables at reboot"
+            user: root
+            special_time: reboot
+            job: "sudo sh /home/che/iptables.sh"
+      - name: UPDATE REBOOT
+        cron:
+            name: "update at reboot"
+            user: "root"
+            special_time: reboot
+            job: "sudo sh /home/che/update.sh >> /var/log/update_script.log"
+      - name: UPDATE AT TIME
+        cron:
+            name: "update time"
+            user: "root"
+            weekday: "1"
+            minute: "0"
+            hour: "4"
+            job: "sudo sh /home/che/update.sh >> /var/log/update_script.log"
+      - name: WATCH AT TIME
+        cron:
+            name: "watch time"
+            user: "root"
+            minute: "0"
+            hour: "0"
+            job: "sudo sh /home/che/watch.sh"
+      - name: SSH | Disable PasswordAuthentication
+        lineinfile:
+            path: /etc/ssh/sshd_config
+            regexp: '^#PasswordAuthentication'
+            line: 'PasswordAuthentication no'
+            backrefs: yes
+      - name: SSH | Disable root
+        lineinfile:
+            path: /etc/ssh/sshd_config
+            regexp: '^PermitRootLogin '
+            line: 'PermitRootLogin no'
+            backrefs: yes
+      - name: SSH | Restart
+        service:
+            name: sshd
+            state: restarted
